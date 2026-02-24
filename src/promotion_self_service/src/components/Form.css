@@ -201,6 +201,26 @@
   color: white;
 }
 
+.get-urg-ser-spe-excel {
+  margin-left: 7px;
+  background-color: #FF4C4C;
+  color: white;
+}
+
+.get-bi-weekly-sql {
+  width: 185px;
+  background-color: #9575e6;
+  color: white;
+}
+
+.get-urg-ser-spe-sql {
+  width: 290px;
+  margin-left: 7px;
+  background-color: #5a7bd5;
+  color: white;
+  /* -webkit-text-stroke: 0.1px #ff7423; */
+}
+
 .get-bi-email:hover:not(:disabled) {
   background-color: #3e8e41;
 }
@@ -211,6 +231,18 @@
 
 .get-urg-ser-spe-email:hover:not(:disabled) {
   background-color: #e68a00;
+}
+
+.get-urg-ser-spe-excel:hover:not(:disabled) {
+  background-color: #D43A3A;
+}
+
+.get-bi-weekly-sql:hover:not(:disabled) {
+  background-color: #7656c7;
+}
+
+.get-urg-ser-spe-sql:hover:not(:disabled) {
+  background-color: #3d5aaa;
 }
 
 .error {

@@ -12,7 +12,7 @@ const Form = () => {
   const [batchNo, setBatchNo] = useState(currentMonth);
   const [emailError, setEmailError] = useState('');
   const [apiResponse, setApiResponse] = useState({});
-  const [submitted, setSubmitted] = useState(false);
+  const [submitted, setSubmitted] = useState(false); //bool
 
   const handleEmailUserChange = (e) => {
     const newEmail = e.target.value;
@@ -148,6 +148,143 @@ const Form = () => {
     }
   };
 
+    const handleGetUrgSerSpeExcel = (e) => {
+    e.preventDefault();
+    const completeEmail = `${emailUser}@${emailDomain}`;
+    if(confirm(`Confirm to send urgent/service/special excel?`)) {
+      setSubmitted(true);
+      setApiResponse(setup_param.default_loading_message);      
+
+//       axios.get(`${setup_param.backend_api_endpoint}/v1/receive-urgent-service-special-excel/email=${completeEmail}`)
+//         .then(res => {
+//           setApiResponse(res.data);
+//           setSubmitted(false);
+//         }).catch(err => {
+//           console.error('Error:', err);
+//           setSubmitted(false);
+//         });
+        
+      axios.get(`${setup_param.backend_api_endpoint}/v1/get-urgent-service-special-excel/email=${completeEmail}`, {
+        responseType: 'blob' // Important for binary data
+      })
+      .then(response => {
+        // Check if response data is valid
+        if (!response.data || response.data.size === 0){
+          setApiResponse({
+            status: 'error',
+            message: `Failed to send Excel file Something might have gone wrong in the backend.`
+          });
+          return;
+        }
+
+//         const byteArray = new Uint8Array(response.data);
+//         const blob = new Blob([response.data]);
+//
+//         // Create a URL for the blob
+//         const url = window.URL.createObjectURL(blob);
+//
+//         const link = document.createElement('a');
+//         link.href = url;
+//         link.setAttribute('download', `temp.xlsx`);
+//
+//         document.body.appendChild(link);
+//         link.click();
+//         document.body.removeChild(link);
+//
+//         window.URL.revokeObjectURL(url);
+
+        setApiResponse({ status: 'success', message: `Successfully sent Excel file` });
+        setSubmitted(false);
+      })
+      .catch(error => {
+        console.error('Error sending files:', error);
+        setApiResponse({ status: 'error', message: 'Failed to send files. Please try again later.' });
+      })
+      .finally(() => {
+        // clearInterval(intervalID);
+        // setTimer(null);
+        setSubmitted(false);
+      });
+
+
+    }
+  };
+
+  const handleGetUrgSerSpeSQLFiles = (e) => {
+    e.preventDefault();
+    if(confirm(`Confirm to download SQL files?`)) {
+      setSubmitted(true);
+      setApiResponse(setup_param.default_loading_message);      
+      // Use axios to download the file with blob response type
+      axios.get(`${setup_param.backend_api_endpoint}/v1/get-urgent-service-special-verify-sql-zip`, {
+        responseType: 'blob' // Important for binary data
+      })
+      .then(response => {
+        // Check if response data is valid
+        if (!response.data || response.data.size === 0){
+          setApiResponse({ 
+            status: 'error', 
+            message: `Failed to download sql.zip. Something might have gone wrong in the backend.` 
+          });
+          return;
+        }
+
+        // Create a blob from the response data
+        const blob = new Blob([response.data]);
+        
+        // Create a URL for the blob
+        const url = window.URL.createObjectURL(blob);
+
+        let newDate = new Date()
+        // let date = newDate.getDate();
+        // let month = newDate.getMonth() + 1;
+        let date = newDate.getDate().toString().padStart(2, '0');
+        let month = (newDate.getMonth() + 1).toString().padStart(2, '0');
+        let year = newDate.getFullYear();
+        
+        // Create a temporary anchor element to trigger download
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `Verify_UrgSerSpeSQL_${year}${month}${date}.zip`);
+        
+        // Append to document, click, and remove
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Clean up the URL object
+        window.URL.revokeObjectURL(url);
+        
+        setApiResponse({ status: 'success', message: `Successfully downloaded sql files` });
+      })
+      .catch(error => {
+        console.error('Error downloading files:', error);
+        setApiResponse({ status: 'error', message: 'Failed to download files. Please try again later.' });
+      })
+      .finally(() => {
+        // clearInterval(intervalID);
+        // setTimer(null);
+        setSubmitted(false);
+      });
+    }
+    
+  };
+
+      // Use axios to download the file with blob response type
+      // axios.get(`${setup_param.backend_api_endpoint}/v1/get-urgent-service-special-excel/email=${completeEmail}`, {
+      //   responseType: 'blob' // Important for binary data
+      // })
+
+//       axios.get(`${setup_param.backend_api_endpoint}/v1/get-urgent-service-special-excel/email=${completeEmail}`)
+//         .then(res => {
+//           setApiResponse(res.data);
+//           setSubmitted(false);
+//         }).catch(err => {
+//           console.error('Error:', err);
+//           setSubmitted(false);
+//         });
+//       Use axios to download the file with blob response type
+
   return (
     <div className="form-container">
       <h2 className="form-header">Promotion Updates Self-Service</h2>
@@ -265,6 +402,30 @@ const Form = () => {
               disabled={submitted}
             >
               Get Bi-weekly Files
+            </button>
+            <button 
+              type="button" 
+              onClick={handleGetUrgSerSpeExcel}
+              disabled={!emailUser || !emailDomain || submitted}
+              className="submit-btn get-urg-ser-spe-excel"
+              title={emailUser && emailDomain ? `Click to receive urgent/service/special excel email at ${emailUser}@${emailDomain}` : undefined}
+            >
+              Get Urgent/Service/Special Excel
+            </button>
+            <button
+             type="button"
+             className="submit-btn get-bi-weekly-sql"
+             disabled={submitted}
+            >
+              Get Bi-weekly SQL
+            </button>
+            <button
+              type="button"
+              onClick={handleGetUrgSerSpeSQLFiles}
+              className="submit-btn get-urg-ser-spe-sql"
+              disabled={submitted}
+            >
+              Get Urgent/Service/Special SQL
             </button>
           </div>
         </div>

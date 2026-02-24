@@ -1,5 +1,5 @@
 const setup_param = {
-    backend_api_endpoint: `http://${document.location.hostname}:9010/api`,
+    backend_api_endpoint: `http://${document.location.hostname}:8082/api`,
     default_email_domain: 'ha.org.hk',
     default_loading_message: {
         status: 'loading',
