@@ -33,4 +33,24 @@ public class RestController {
     public Map<String, String> receiveUrgSerSpecEmail(@PathVariable("email_address") String email_address) {
         return PayloadHandler.handleReceiveUrgSerSpeEmail(email_address);
     }
+
+    @ResponseBody
+    @GetMapping(value = "/v1/get-urgent-service-special-excel/email={email_address}", produces="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    public byte[] getUrgSerSpecExcel(@PathVariable("email_address") String email_address) throws IOException {
+        return PayloadHandler.handleGetUrgSerSpeExcel(email_address);
+    }
+
+    @ResponseBody
+    @GetMapping(value = "/v1/get-urgent-service-special-verify-sql-zip", produces="application/zip")
+    public byte[] getUrgSerSpecVerifySqlZip() {
+        return PayloadHandler.handleGetUrgSerSpeVerifySqlZip();
+    }
+
+    @ResponseBody
+    @GetMapping(value = "/v1/get-Biweekly-verify-sql-zip", produces="application/zip")
+    public byte[] getBiweeklyVerifySqlZip() {
+        return PayloadHandler.handleGetBiweeklyVerifySqlZip();
+    }
 }
+
+

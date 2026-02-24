@@ -19,6 +19,7 @@ public class PromoForm implements Comparable<PromoForm> {
     private String description = "";
     private String k2FormLink = "";
     private String k2FormNo = "";
+    private String impHospSql = "";
     private List<String> types = new ArrayList<>();
     private List<String> impManualItems = new ArrayList<>();
     private boolean isImpHospOrImpCorp = false;
@@ -63,6 +64,11 @@ public class PromoForm implements Comparable<PromoForm> {
 
     public PromoForm k2FormNo(String k2FormNo){
         this.k2FormNo = k2FormNo;
+        return this;
+    }
+    
+    public PromoForm impHospSql(String impHospSql) {
+        this.impHospSql = impHospSql;
         return this;
     }
 

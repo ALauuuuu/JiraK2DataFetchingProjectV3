@@ -75,13 +75,16 @@ public final class SingletonConfig {
     private EmailConfig emailConfig = new EmailConfig();
     @Getter
     private List<String> hospList = new ArrayList<>();
+    @Getter
+    private List<String> recipients = new ArrayList<>();
 
     @Override
     public String toString(){
         return "Admin: " + admin
                 + "\n\nAPIConfig: " + apiConfig
                 + "\n\nEmailConfig: " + emailConfig
-                + "\n\nHospList: " + hospList;
+                + "\n\nHospList: " + hospList
+                + "\n\nRecipients: " + recipients;
     }
 
     /*public static void setJsonFile(File jsonFile){SingletonConfig.jsonFile = jsonFile;}

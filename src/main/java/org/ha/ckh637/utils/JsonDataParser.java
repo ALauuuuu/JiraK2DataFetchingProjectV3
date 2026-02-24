@@ -5,11 +5,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.ha.ckh637.component.DataCenter;
 import org.ha.ckh637.component.PromoForm;
+import org.ha.ckh637.component.VerifyScript;
 import org.ha.ckh637.service.APIQueryService;
 import org.ha.ckh637.service.AppIniService;
 import reactor.core.publisher.Mono;
 
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class JsonDataParser {
     private JsonDataParser(){}
@@ -116,7 +119,7 @@ public class JsonDataParser {
         }
     }
 
-    public static void parseStandardJiraResp(final String year_batch, Mono<String> monoJiraResp, boolean isBiweekly){
+    public static void parseStandardJiraResp(final String year_batch, Mono<String> monoJiraResp, boolean isBiweekly, boolean isSQL){
         String jiraResp = monoJiraResp.block();
         try{
             JsonNode issues = OBJECT_MAPPER.readTree(jiraResp).get("issues");
@@ -146,6 +149,13 @@ public class JsonDataParser {
                     String jFrogResp = APIQueryService.fetchJFrogAPIForTypes(k2FormNo);
 //                    allTypePaths = retrieveTypePathsAndImpManualItemsFromJFrogResp(jFrogResp);
                     Map<String, List<String>> retrievedResults = retrieveTypePathsAndImpManualItemsFromJFrogResp(jFrogResp, isBiweekly);
+                    if (isSQL) {
+                        String sqlContent = retrieveSQLContent(jFrogResp);
+                        if (!(sqlContent.isEmpty() || sqlContent==null)) {
+                            promoForm.impHospSql(sqlContent);
+                            VerifyScript.addPromoForm(promoForm);
+                        }
+                    }
                     allTypePaths = retrievedResults.get("allTypePaths");
                     allImpManualItems = retrievedResults.get("allImpManualItems");
                 }else{
@@ -398,5 +408,234 @@ public class JsonDataParser {
             e.printStackTrace();
         }
         return result;
+    }
+
+
+    //************ testing stage
+    private static String retrieveSQLContent(String jFrogResp){
+        Mono<String> resp;
+        String resultSqlContent = "";
+        String resultSqlDeclaration = "";
+
+        try {
+            JsonNode results = OBJECT_MAPPER.readTree(jFrogResp).get("results");
+            for (JsonNode currResult: results){
+                String path = currResult.get("path").asText();
+                String name = currResult.get("name").asText();
+                String fullPath;
+
+                int keyIndex = path.indexOf("imp-hosp-db");
+
+                if (keyIndex >=0){ 
+                    fullPath = path + "/" + name;
+                    resp = APIQueryService.fetchSQLContent(fullPath);
+                    // System.out.println("filename: " + name);
+                    resultSqlDeclaration = parseJfrogImpHospSqlDeclaration(resp);
+                    resultSqlContent = parseJfrogImpHospSql(resp);
+                    // System.out.println("SQL Content in retrievePathForSQLContent: \n");
+                    // System.out.println(resultSqlContent.isEmpty() ? "" : resultSqlDeclaration + "\n" + resultSqlContent);
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return resultSqlContent.isEmpty() ? "" : resultSqlDeclaration + resultSqlContent + "\nGO";
+    }
+
+    public static String parseJfrogImpHospSql(Mono<String> resp) {
+        String sqlText = resp.block();
+        StringBuilder selectStatements = new StringBuilder();
+        
+        // Normalize the input by removing excess whitespace
+        sqlText = sqlText.replaceAll("\\s+", " ").trim();
+        
+        // Pattern to match each update statement
+        Pattern updatePattern = Pattern.compile(
+            "(?i)update\\s+([\\w@_-]+)\\s+set\\s+(.*?)\\s+where\\s+(.*?)(?=;|(?i)update|$)"
+        );
+        Matcher matcher = updatePattern.matcher(sqlText);
+        
+        
+        while (matcher.find()) {
+            String tableName = matcher.group(1).trim();
+            String setClause = matcher.group(2);
+            String whereClause = matcher.group(3).trim();
+            
+            // Extract columns from set clause
+            List<String> columnNames = new ArrayList<>();
+            String[] setParts = setClause.split(",");
+            for (String setPart : setParts) {
+                if (setPart.contains("=")) {
+                    setPart = setPart.split("=")[0].trim();
+                    String columnName = setPart.split("=")[0].trim();
+                    columnNames.add(columnName);
+                }
+            }
+
+            // Extract valid conditions
+            String validWhereClause = extractValidConditions(whereClause);
+
+            if (validWhereClause != null) {
+                // Construct the select statement only if the where clause is valid
+                String selectClause = String.join(", ", columnNames);
+                String selectStatement = String.format(
+                    "SELECT %s FROM %s WHERE %s",
+                    selectClause, tableName, validWhereClause
+                );
+                selectStatements.append(selectStatement).append("\n");
+            }
+        }
+
+        return selectStatements.toString();
+    }
+
+    private static String extractValidConditions(String whereClause) {
+        String conditionPattern1 = "(?i)\\b\\w[\\w@_-]*\\s*(=|!=|is\\s+not|is|in)\\s*(null|@[\\w@_-]+|'[^']*'|\\d+(\\.\\d+)?|\\([^()]*\\))\\s*(?=(AND|OR|and|or)\\b|\\z)";
+        String conditionPattern2 = "(?i)\\b\\w[\\w@_-]*\\s*(=|!=|is\\s+not|is|in)\\s*(null|@[\\w@_-]+|'[^']*'|\\d+(\\.\\d+)?|\\([^()]*\\))";
+        Matcher matcher1 = Pattern.compile(conditionPattern1).matcher(whereClause);
+        Matcher matcher2 = Pattern.compile(conditionPattern2).matcher(whereClause);
+    
+        StringBuilder validConditions = new StringBuilder();
+        int index = 0;
+    
+        while (matcher1.find(index) || matcher2.find(index)) {
+            // System.out.println(validConditions.toString());
+            
+            if (matcher1.find(index)) {
+                if (matcher2.find(index)) {
+                    if (matcher1.end()-1 <= matcher2.end()) {
+                        validConditions.append(matcher1.group().trim()).append(" ");
+                        index = matcher1.end();
+                    } else {
+                        validConditions.append(matcher2.group().trim()).append(" ");
+                        break;
+                    }
+                } else {
+                    validConditions.append(matcher1.group().trim()).append(" ");
+                    index = matcher1.end();
+                }
+            } else {
+                validConditions.append(matcher2.group().trim()).append(" ");
+                break;
+            }
+    
+            if (index < whereClause.length()) {
+                String nextSegment = whereClause.substring(index).trim();
+    
+                // Capture the logical operator if exists
+                if (nextSegment.startsWith("AND ") || nextSegment.startsWith("OR ") ||
+                    nextSegment.startsWith("and ") || nextSegment.startsWith("or ")) {
+                    String operator = nextSegment.split("\\s+")[0];
+                    validConditions.append(operator).append(" ");
+                    index += operator.length() + 1;  // Move past the operator and its trailing space
+                }
+            }
+        }
+    
+        String result = validConditions.toString().trim();
+        return result.isEmpty() ? null : result; // Return null if no valid conditions are found
+    }
+
+    public static String parseJfrogImpHospSqlDeclaration(Mono<String> resp) {
+        // String sqlText = resp.block().replace("\t", "");
+        String sqlText = resp.block().replace("\t", "");
+        String result = "";
+
+        // String initialRegex = "(?i)declare[\\s\\S]*?\\n(?:set|select)[\\s\\S]*?\\n";
+        String initialRegex = "(?i)declare[\\s\\S]*?\\n(?:set|select)?[\\s\\S]*?\\n";
+        String setBlockRegex = "(?i)set\\s+\\w+\\s+on[\\r\\n]+[\\s\\S]*?[\\r\\n]+set\\s+\\w+\\s+off[\\r\\n]*";
+
+        Pattern pattern = Pattern.compile(initialRegex);
+        Matcher matcher = pattern.matcher(sqlText);
+        
+//  String setBlockRegex2 = "(?i)^(?!\\s*--)(?!\\s*\\*).*\\b(?:select)\\b.*\\b\\w[\\w@_-]*\\s*(=)\\s*('[^']*'|\\d+(\\.\\d+)?)[\\s]*?\\n";
+// String setBlockRegex2 = "^(?!\\s*--)(?!\\s*\\*).*\\bselect\\b.*\\b\\w[\\w@_-]*\\s*(=)\\s*('[^']*'|\\d+(\\.\\d+)?)[\\s]*?\\n";
+// String setBlockRegex2 = "(?i)\\b(?:select)\\b.*\\b\\w[\\w@_-]*\\s*(=)\\s*('[^']*'|\\d+(\\.\\d+)?)[\\s]*?\\n";
+
+        String setBlockRegex2 = "(?i)(?:^\\s*|--|/\\*)?\\s?\\b(?:select)\\b.*\\b\\w[\\w@_-]*\\s*(=)\\s*('[^']*'|\\d+(\\.\\d+)?|null)[\\s]*?\\n";
+
+// String setBlockRegex2 = "(?i)(select)\\b.*\\b\\w[\\w@_-]*\\s*(=)\\s*('[^']*'|\\d+(\\.\\d+)?)[\\s]*?\\n";
+// String setBlockRegex2 = "(?i)\\bselect\\b.*?\\b\\w[\\w@_-]*\\s*=\\s*('[^']*'|\\d+(\\.\\d+)?)\\s*\\n$";
+        Pattern pattern2 = Pattern.compile(setBlockRegex2);
+        Matcher matcher2 = pattern2.matcher(sqlText);
+
+        if (matcher.find()) {
+            do {
+                result = result + matcher.group().replaceAll("(?m)^\\s+(?i)(declare)", "$1");
+            } while(matcher.find());
+            Pattern setBlockPattern = Pattern.compile(setBlockRegex);
+            Matcher setBlockMatcher = setBlockPattern.matcher(sqlText);
+            
+            String[] resultWords = result.split("\n");
+            // for (int i = 0; i < resultWords.length; i++) {
+            //     String word = resultWords[i];
+            //     System.out.println("Original: " + word.trim().replace("\n", ""));
+            //     if (word != null && (word.trim().startsWith("--") || word.trim().startsWith("/*"))) {
+            //         resultWords[i] = "";
+            //     }
+            //     System.out.println("edited: " + resultWords[i]);
+            // }
+            
+            StringBuilder modifiedResult = new StringBuilder();
+            
+            for (int i = 0; i < resultWords.length; i++) {
+                String word = resultWords[i].trim();
+                if (!word.startsWith("--") && !word.startsWith("/*") && !word.equals("")) {
+                    if (modifiedResult.length() > 0) {
+                        modifiedResult.append("\n");
+                    }
+                    modifiedResult.append(resultWords[i]);
+                }
+            }
+            
+            result = modifiedResult.toString();
+
+            if (setBlockMatcher.find()) {
+                String[] addWords = setBlockMatcher.group().split("\n");
+                LinkedHashSet<String> allWords = new LinkedHashSet<>(Arrays.asList(resultWords));
+                
+                for (String word : addWords) {
+                    System.out.println("Set block: " + word);
+                    if (!allWords.contains(word)) {
+                        allWords.add(word);
+                    }
+                }
+                result = String.join("\n", allWords);
+            }
+            
+            if (matcher2.find()) {
+                LinkedHashSet<String> allWords = new LinkedHashSet<>(Arrays.asList(resultWords));
+                String temp;
+                
+                do {
+                    temp = matcher2.group();
+                    temp = temp.trim().replace("\n", "").replace("\n", "");
+                    if (temp.startsWith("--") || temp.startsWith("/*")) {
+                        continue;
+                    }
+                    else if (!allWords.contains(temp)) {
+                        allWords.add(temp);
+                    }
+                } while (matcher2.find());
+                result = String.join("\n", allWords);
+            }
+            
+        }
+        return result.isEmpty() ? "" : result + "\n";
+    }
+
+
+    //*************Confirmed
+    public static String parseSQLFileName(PromoForm promoForm) {
+        Pattern patternDescription = Pattern.compile("([a-zA-Z]{1,15}-\\d{1,10}): (.+)");
+        Matcher matcherDescription;
+        String jiraTicket;
+        matcherDescription = patternDescription.matcher(promoForm.getDescription());
+        if (matcherDescription.find()) {
+            jiraTicket = matcherDescription.group(1);
+            return "Verify_" + promoForm.getSummary().trim() + "_" + jiraTicket.trim() + ".sql";
+        }
+        return "";
     }
 }

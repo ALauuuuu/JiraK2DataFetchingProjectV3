@@ -138,6 +138,17 @@ public final class APIQueryService {
 //        return DataManip.jFrogRespJsonManip(formSummary, response);
     }
 
+    public static Mono<String> fetchSQLContent(String path){ //change
+        String targetURL = "http://160.98.24.163:55742/artifactory/cms_cicd_package/" + path;
+        Mono<String> response = CUSTOM_WEB_CLIENT
+                .get()
+                .uri(targetURL)
+                .headers(headers -> headers.setBasicAuth(USERNAME, PASSWORD))
+                .retrieve()
+                .bodyToMono(String.class);
+        return response;
+    }
+
     public static String fetchTicketSummary(String ticket){
         // cf[11599]~NDORS-705&fields=summary
         String targetAPI = SingletonConfig.getInstance().getJiraRestAPI() + String.format("cf[11599]~%s&fields=summary", ticket);

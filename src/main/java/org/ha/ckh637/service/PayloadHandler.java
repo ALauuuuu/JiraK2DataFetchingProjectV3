@@ -2,10 +2,17 @@ package org.ha.ckh637.service;
 
 import org.ha.ckh637.component.CachedData;
 import org.ha.ckh637.component.EmailHTML;
+import org.ha.ckh637.component.ExcelSheet;
 import org.ha.ckh637.component.RequestData;
 import org.ha.ckh637.component.DataCenter;
 import org.ha.ckh637.utils.JsonDataParser;
+
 import reactor.core.publisher.Mono;
+
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -13,11 +20,15 @@ import java.nio.file.Paths;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import org.apache.poi.ss.usermodel.Workbook;
+
 public final class PayloadHandler {
     private PayloadHandler(){}
     private static final DataCenter DATA_CENTER = DataCenter.getInstance();
     private static final ReentrantReadWriteLock.ReadLock READ_LOCK = ConcurencyControl.getREAD_LOCK();
     private static final ReentrantReadWriteLock.WriteLock WRITE_LOCK = ConcurencyControl.getWRITE_LOCK();
+    private static byte[] cachedExcelData = null;
+    private static byte[] cachedSQLData = null;
 
     public static byte[] handleGetZipByBatch(String payload){
         if (isValidYearBatch(payload)){
@@ -62,6 +73,75 @@ public final class PayloadHandler {
                     READ_LOCK.unlock();
                 }
             }
+        }
+        return null;
+    }
+
+    public static byte[] handleGetUrgSerSpeExcel(final String email_address) throws IOException{
+        READ_LOCK.lock();
+        try {
+            if (cachedExcelData != null) {
+                return cachedExcelData;
+            }
+        } finally {
+             cachedExcelData = null;
+             READ_LOCK.unlock();
+        }
+        WRITE_LOCK.lock();
+        try {
+             if (cachedExcelData == null) {
+                eventSequenceUrgSerSpeExcel();
+                ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                XSSFWorkbook workbook = ExcelSheet.getInstance().getResult();
+                
+                workbook.write(bos);
+                    
+                cachedExcelData = bos.toByteArray();
+
+                EmailService.sendEmailWithExcelAttachment(email_address, cachedExcelData);
+                // ExcelEmailService.sendEmailWithExcelAttachment(cachedExcelData);
+
+                ExcelSheet.getInstance().clearWorkbookContent(ExcelSheet.getInstance().getResult());
+                bos.close();
+             }
+            
+            return cachedExcelData;
+        } finally {
+            cachedExcelData = null;
+            WRITE_LOCK.unlock();
+        }
+        // eventSequenceUrgSerSpeExcel();
+        // ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        // XSSFWorkbook workbook = ExcelSheet.getInstance().getResult();
+        
+        // workbook.write(bos);
+            
+        // byte[] byteArray = bos.toByteArray();
+            
+
+        // bos.close();
+
+        // return byteArray;
+    }
+
+    public static byte[] handleGetUrgSerSpeVerifySqlZip() {
+        READ_LOCK.lock();
+        try {
+            if (cachedExcelData != null) {
+                return cachedExcelData;
+            }
+        } finally {
+        cachedSQLData = null;
+        READ_LOCK.unlock();
+        }
+        WRITE_LOCK.lock();
+        try{
+            if (cachedSQLData == null) {
+                eventSquenceUrgSerSpeSQL();
+                return cachedSQLData;
+            }
+        } finally {
+            WRITE_LOCK.unlock();
         }
         return null;
     }
@@ -123,6 +203,7 @@ public final class PayloadHandler {
                     "message", "Exception encountered in the backend: " + e.getMessage());
         }
     }
+
 
     public static Map<String, String> handleReceiveBiweeklyEmail(String email_address, String year_batch){
         try{
@@ -193,6 +274,10 @@ public final class PayloadHandler {
         }
     }
 
+    public static byte[] handleGetBiweeklyVerifySqlZip() {
+        return null;
+    }
+
     private static boolean isInvalidEmail(String email){
         return !(email.contains("@") && email.contains("."));
     }
@@ -218,7 +303,7 @@ public final class PayloadHandler {
         DATA_CENTER.clearAllApiData();
         Thread t1 = new Thread(() -> {
             Mono<String> monoJiraResp = APIQueryService.fetchJiraUrgentServiceAPI_V2();
-            JsonDataParser.parseStandardJiraResp(null, monoJiraResp, false);
+            JsonDataParser.parseStandardJiraResp(null, monoJiraResp, false, false);
         });
         t1.start();
         try{
@@ -232,12 +317,82 @@ public final class PayloadHandler {
         new BackgroundService().scheduleDeleteUrgSerSpeCachedData();
     }
 
+
+    public static void eventSequenceUrgSerSpeExcel(){
+        DATA_CENTER.clearAllApiData();
+        Thread t1 = new Thread(() -> {
+            Mono<String> monoJiraResp = APIQueryService.fetchJiraUrgentServiceAPI_V2();
+            // JsonDataParser.parseJiraUrgentServiceForBiweeklyResp(monoJiraResp);
+            JsonDataParser.parseStandardJiraResp(null, monoJiraResp, false, false);
+        });
+        t1.start();
+        try{
+            t1.join();
+        }catch (InterruptedException e){
+            e.printStackTrace();
+        }
+        EmailHTML.compileEmailHTMLContentExcel(true);
+
+        DATA_CENTER.clearAllApiData();
+
+        // DATA_CENTER.setCachedUrgSerSpeEmailHTML(finalContent);
+        // DATA_CENTER.clearAllApiData();
+        // new BackgroundService().scheduleDeleteUrgSerSpeCachedData();
+
+    }
+
+    public static void eventSquenceUrgSerSpeSQL() {
+        DATA_CENTER.clearAllApiData();
+        Thread t1 = new Thread( () -> {
+            Mono<String> monoJiraResp = APIQueryService.fetchJiraUrgentServiceAPI_V2();
+            // JsonDataParser.parseJiraUrgentServiceForBiweeklyResp(monoJiraResp);
+            JsonDataParser.parseStandardJiraResp(null, monoJiraResp, false, true);
+        });
+        t1.start();
+        try {
+            t1.join();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        try {
+            cachedSQLData = ZipService.compressSQLFileToZip();
+        } catch (IOException e) {
+            e.printStackTrace();
+            cachedSQLData = null;
+        }
+        DATA_CENTER.clearAllApiData();
+    }
+
+
+    public static void eventSquenceBiweeklySQL() {
+        DATA_CENTER.clearAllApiData();
+        Thread t1 = new Thread( () -> {
+            Mono<String> monoJiraResp = APIQueryService.fetchJiraUrgentServiceAPI_V2();
+            // JsonDataParser.parseJiraUrgentServiceForBiweeklyResp(monoJiraResp);
+            JsonDataParser.parseStandardJiraResp(null, monoJiraResp, false, true);
+        });
+        t1.start();
+        try {
+            t1.join();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        try {
+            cachedSQLData = ZipService.compressSQLFileToZip();
+        } catch (IOException e) {
+            e.printStackTrace();
+            cachedSQLData = null;
+        }
+        DATA_CENTER.clearAllApiData();
+    }
+
+
     private static void eventSequenceBiweekly_V2_multiThreaded(RequestData requestData, final String year_batch) {
         // Make sure no trailing data left from previous computation
         DATA_CENTER.clearAllApiData();
         Thread t1 = new Thread(() -> {
             Mono<String> monoJiraResp = APIQueryService.fetchJiraBiweeklyAPI_V2(requestData);
-            JsonDataParser.parseStandardJiraResp(year_batch, monoJiraResp, true);
+            JsonDataParser.parseStandardJiraResp(year_batch, monoJiraResp, true, false);
         });
         Thread t2 = new Thread(() -> {
             Mono<String> monoJiraResp = APIQueryService.fetchJiraUrgentServiceForBiweeklyAPI_V2(requestData);
@@ -281,4 +436,6 @@ public final class PayloadHandler {
         // Schedule to delete the cached data to ensure freshness
         new BackgroundService().scheduleDeleteBiweeklyCachedData(year_batch);
     }
+
+
 }

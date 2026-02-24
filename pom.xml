@@ -45,10 +45,73 @@
             <artifactId>jsoup</artifactId>
             <version>1.19.1</version>
         </dependency>
+        
+<!--        <dependency>-->
+<!--            <groupId>com.jacob</groupId>-->
+<!--            <artifactId>jacob</artifactId>-->
+<!--            <version>1.21</version>-->
+<!--        </dependency>-->
+<!--        -->
+        <!-- https://mvnrepository.com/artifact/com.hynnet/jacob -->
+
         <dependency>
-            <groupId>com.jacob</groupId>
+            <groupId>com.hynnet</groupId>
             <artifactId>jacob</artifactId>
-            <version>1.21</version>
+            <version>1.18</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.sun.mail</groupId>
+            <artifactId>jakarta.mail</artifactId>
+            <version>2.0.1</version>
+        </dependency>
+        <dependency>
+            <groupId>com.sun.activation</groupId>
+            <artifactId>jakarta.activation</artifactId>
+            <version>2.0.1</version>
+        </dependency>
+
+        <!-- Apache POI dependency for handling Excel files -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi</artifactId>
+            <version>5.2.3</version>
+        </dependency>
+        <!-- Apache POI dependency for handling .xlsx files -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.2.3</version>
+        </dependency>
+        <!-- Add poi-ooxml-schemas if you need extended schemas -->
+        <!-- <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml-schemas</artifactId>
+            <version>4.1.2</version>
+        </dependency> -->
+        <!-- Add XMLBeans if you need some extended functionality -->
+        <dependency>
+            <groupId>org.apache.xmlbeans</groupId>
+            <artifactId>xmlbeans</artifactId>
+            <version>5.1.1</version>
+        </dependency>
+        <!-- Dependency required for handling .xlsx file formats -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-collections4</artifactId>
+            <version>4.4</version>
+        </dependency>
+        <!-- Dependency for additional functionalities -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-compress</artifactId>
+            <version>1.20</version>
+        </dependency>
+        <!-- Dependency for working with backported JSR173 StAX API -->
+        <dependency>
+            <groupId>org.apache.geronimo.specs</groupId>
+            <artifactId>geronimo-stax-api_1.0_spec</artifactId>
+            <version>1.0.1</version>
         </dependency>
     </dependencies>
     <build>

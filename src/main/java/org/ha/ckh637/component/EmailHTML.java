@@ -308,4 +308,31 @@ public final class EmailHTML {
                 unrelatedCnt.get(), unrelatedTableContent.toString(),
                 isUrgentService);
     }
+
+    public static void compileEmailHTMLContentExcel(final boolean isUrgentService){
+        StringBuilder relatedTableContent = new StringBuilder();
+        StringBuilder unrelatedTableContent = new StringBuilder();
+        final AtomicInteger relatedCnt = new AtomicInteger();
+        final AtomicInteger unrelatedCnt = new AtomicInteger();
+
+        DATA_CENTER.getKeyPromoFormMap().values().forEach(promoForm -> {
+            if (promoForm.isImpHospOrImpCorp()){
+                ExcelSheet.getInstance().setExcelContent(promoForm, isUrgentService, true);
+                // relatedCnt.getAndIncrement();
+                // relatedTableContent.append(genTableRowContent_V2(promoForm, isUrgentService));
+            }else{
+                ExcelSheet.getInstance().setExcelContent(promoForm, isUrgentService, false);
+                // unrelatedCnt.getAndIncrement();
+                // unrelatedTableContent.append(genTableRowContent_V2(promoForm, isUrgentService));
+            }
+        });
+
+        // return EmailHTML.dynamicEmailHTMLDom(
+        //         relatedCnt.get(),
+        //         relatedTableContent.toString(),
+        //         unrelatedCnt.get(), unrelatedTableContent.toString(),
+        //         isUrgentService);
+    }
 }
+
+// do some edition to compileEmailHTMLContent can create a xlsx file
